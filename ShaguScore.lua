@@ -13,9 +13,22 @@ ShaguScore:SetScript("OnShow", function()
     local _, _, itemID = string.find(GameTooltip.itemLink, "item:(%d+):%d+:%d+:%d+")
     local _, _, itemLink = string.find(GameTooltip.itemLink, "(item:%d+:%d+:%d+:%d+)");
 
-    if not itemLink then return end
+    if not itemLink or not itemID then return end
 
-    local itemLevel = ShaguScore.Database[tonumber(itemID)] or 0
+    -- NEW LOGIC: First Datenbank, then GetItemLevel as Fallback
+    local itemID_num = tonumber(itemID)
+    local itemLevel = ShaguScore.Database[itemID_num]
+
+    if not itemLevel then
+      local success, result = pcall(GetItemLevel, itemID_num)
+      if success and result then
+        itemLevel = result
+      else
+        itemLevel = 0 
+      end
+    end
+    -- END NEW LOGIC
+
     local _, _, itemRarity, _, _, _, _, itemSlot, _ = GetItemInfo(itemLink)
     local r,g,b = GetItemQualityColor(itemRarity)
 
@@ -116,7 +129,20 @@ function ShaguScore:ScanUnit(target)
       local _, _, itemID = string.find(GetInventoryItemLink(target, i), "item:(%d+):%d+:%d+:%d+")
       local _, _, itemLink = string.find(GetInventoryItemLink(target, i), "(item:%d+:%d+:%d+:%d+)");
 
-      local itemLevel = ShaguScore.Database[tonumber(itemID)] or 0
+     -- NEW LOGIC: First Datenbank, then GetItemLevel as Fallback
+      local itemID_num = tonumber(itemID)
+      local itemLevel = ShaguScore.Database[itemID_num]
+
+      if not itemLevel then
+        local success, result = pcall(GetItemLevel, itemID_num)
+        if success and result then
+          itemLevel = result
+        else
+          itemLevel = 0 -- Fallback, wenn alles fehlschlägt
+        end
+      end
+      -- END NEW LOGIC
+
       local _, _, itemRarity, _, _, _, _, itemSlot, _ = GetItemInfo(itemLink)
       local r, g, b = .2, .2, .2
 
