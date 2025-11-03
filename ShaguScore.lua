@@ -15,29 +15,35 @@ ShaguScore:SetScript("OnShow", function()
 
     if not itemLink or not itemID then return end
 
-    local itemID_num = tonumber(itemID)
-    local itemLevel = ShaguScore.Database[itemID_num]
-
-    if not itemLevel then
-      local success, result = pcall(GetItemLevel, itemID_num)
-      if success and result then
-        itemLevel = result
-      else
-        itemLevel = 0
-      end
-    end
-    
+    -- Hole die Informationen des Gegenstands, insbesondere den Ausrüstungsplatz (itemSlot)
     local _, _, itemRarity, _, _, _, _, itemSlot, _ = GetItemInfo(itemLink)
 
-    -- NEUE BEDINGUNG: Prüfen, ob der Gegenstand ein Ausrüstungs-Slot hat.
-    if not itemSlot or itemSlot == "" then return end
-    
-    local r,g,b = GetItemQualityColor(itemRarity)
+    -- NEUE BEDINGUNG: Führe den Code nur aus, wenn der Gegenstand einen Ausrüstungsplatz hat.
+    -- Für Nicht-Ausrüstung ist 'itemSlot' ein leerer String "".
+    if itemSlot and itemSlot ~= "" then
+      -- Der Code innerhalb dieser if-Abfrage wird jetzt nur noch für Ausrüstung ausgeführt.
 
-    local score = ShaguScore:Calculate(itemSlot, itemRarity, itemLevel)
-    if score and score > 0 then
-      GameTooltip:AddLine("ShaguScore: " .. score, r, g, b)
-      GameTooltip:Show()
+      -- NEW LOGIC: First Datenbank, then GetItemLevel as Fallback
+      local itemID_num = tonumber(itemID)
+      local itemLevel = ShaguScore.Database[itemID_num]
+
+      if not itemLevel then
+        local success, result = pcall(GetItemLevel, itemID_num)
+        if success and result then
+          itemLevel = result
+        else
+          itemLevel = 0
+        end
+      end
+      -- END NEW LOGIC
+
+      local r,g,b = GetItemQualityColor(itemRarity)
+      local score = ShaguScore:Calculate(itemSlot, itemRarity, itemLevel)
+
+      if score and score > 0 then
+        GameTooltip:AddLine("ShaguScore: " .. score, r, g, b)
+        GameTooltip:Show()
+      end
     end
   end
 end)
@@ -121,44 +127,50 @@ function ShaguScore:round(num, numDecimalPlaces)
   return math.floor(num * mult + 0.5) / mult
 end
 
+    
 function ShaguScore:ScanUnit(target)
   if not UnitIsPlayer(target) then return nil end
 
   local count, ar, ag, ab, score = 0, 0, 0, 0, 0
 
   for i=1,19 do
-    if GetInventoryItemLink(target, i) then
-      local _, _, itemID = string.find(GetInventoryItemLink(target, i), "item:(%d+):%d+:%d+:%d+")
-      local _, _, itemLink = string.find(GetInventoryItemLink(target, i), "(item:%d+:%d+:%d+:%d+)");
+    -- NEUE BEDINGUNG: Überspringe Shirt (Slot 4) und Tabard (Slot 19)
+    if i ~= 4 and i ~= 19 then
+      if GetInventoryItemLink(target, i) then
+        local _, _, itemID = string.find(GetInventoryItemLink(target, i), "item:(%d+):%d+:%d+:%d+")
+        local _, _, itemLink = string.find(GetInventoryItemLink(target, i), "(item:%d+:%d+:%d+:%d+)");
 
-      local itemID_num = tonumber(itemID)
-      local itemLevel = ShaguScore.Database[itemID_num]
+       -- NEW LOGIC: First Datenbank, then GetItemLevel as Fallback
+        local itemID_num = tonumber(itemID)
+        local itemLevel = ShaguScore.Database[itemID_num]
 
-      if not itemLevel then
-        local success, result = pcall(GetItemLevel, itemID_num)
-        if success and result then
-          itemLevel = result
-        else
-          itemLevel = 0
+        if not itemLevel then
+          local success, result = pcall(GetItemLevel, itemID_num)
+          if success and result then
+            itemLevel = result
+          else
+            itemLevel = 0 -- Fallback, wenn alles fehlschlägt
+          end
+        end
+        -- END NEW LOGIC
+
+        local _, _, itemRarity, _, _, _, _, itemSlot, _ = GetItemInfo(itemLink)
+        local r, g, b = .2, .2, .2
+
+        local cscore = 0
+
+        if itemRarity and itemSlot then
+          r,g,b, _ = GetItemQualityColor(itemRarity)
+          ar = ar + r ; ag = ag + g ; ab = ab + b
+          cscore = ShaguScore:Calculate(itemSlot, itemRarity, itemLevel)
+        end
+
+        if cscore >= 10 then
+          score = score + cscore
+          count = count + 1
         end
       end
-
-      local _, _, itemRarity, _, _, _, _, itemSlot, _ = GetItemInfo(itemLink)
-      local r, g, b = .2, .2, .2
-
-      local cscore = 0
-
-      if itemRarity and itemSlot then
-        r,g,b, _ = GetItemQualityColor(itemRarity)
-        ar = ar + r ; ag = ag + g ; ab = ab + b
-        cscore = ShaguScore:Calculate(itemSlot, itemRarity, itemLevel)
-      end
-
-      if cscore >= 10 then
-        score = score + cscore
-        count = count + 1
-      end
-    end
+    end -- ENDE DER NEUEN BEDINGUNG
   end
 
   if count > 0 then
@@ -171,6 +183,8 @@ function ShaguScore:ScanUnit(target)
 
   if score ~= 0 then return score, ar, ag, ab else return nil end
 end
+
+  
 
 function ShaguScore:GetItemLinkByName(name)
   for itemID = 1, 25818 do
